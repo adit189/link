@@ -196,16 +196,43 @@ export default function App() {
 
   // --- DATABASE OPERATIONS ---
 
-  const getFullApiUrl = (params = "") => `${API_URL}${params}`;
+  // Perbaikan Konstruksi URL untuk Fetch
+  const getFullApiUrl = (params = "") => {
+    try {
+      // Jika di lingkungan browser dengan origin valid, buat absolute URL
+      if (window.location.origin && window.location.origin.startsWith('http')) {
+        return `${window.location.origin}/${API_URL}${params}`;
+      }
+      return `${API_URL}${params}`;
+    } catch (e) {
+      return `${API_URL}${params}`;
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(getFullApiUrl(`?user_id=${USER_ID}`));
-        if (!response.ok) throw new Error('Offline');
+        const url = getFullApiUrl(`?user_id=${USER_ID}`);
+        const response = await fetch(url);
+        
+        if (!response.ok) throw new Error('Network error');
+        
         const text = await response.text();
         let data;
-        try { data = JSON.parse(text); } catch (e) { throw new Error('Invalid JSON'); }
+        try { 
+          data = JSON.parse(text); 
+          // Normalisasi data untuk mencegah crash
+          if (Array.isArray(data)) {
+            data = data.map(p => ({
+              ...p,
+              config: p.config || { title: p.name, description: '', whatsapp: '', enableTestimonialForm: false },
+              items: p.items || [],
+              submittedTestimonials: p.submittedTestimonials || []
+            }));
+          }
+        } catch (e) { 
+          throw new Error('Invalid JSON'); 
+        }
         
         if (data && Array.isArray(data) && data.length > 0) {
           setProjects(data);
@@ -214,6 +241,7 @@ export default function App() {
           loadFallbackData();
         }
       } catch (error) {
+        console.warn("Fetch failed, using local backup:", error.message);
         loadFallbackData();
       } finally {
         setIsLoading(false);
@@ -251,7 +279,8 @@ export default function App() {
     localStorage.setItem('drivelink_backup', JSON.stringify(currentProjects));
     setIsSaving(true);
     try {
-      const response = await fetch(getFullApiUrl(), {
+      const url = getFullApiUrl();
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'save', user_id: USER_ID, content: JSON.stringify(currentProjects) })
@@ -259,7 +288,7 @@ export default function App() {
       if (!response.ok) throw new Error('Offline');
       showNotification("Sinkronisasi Cloud Berhasil");
     } catch (error) {
-      console.log("Mode Lokal Aktif (Data tersimpan di Browser)");
+      console.log("Cloud sync skipped (Local mode active)");
     } finally {
       setIsSaving(false);
     }
@@ -275,8 +304,8 @@ export default function App() {
 
   // --- EFFECT: SHOW TESTIMONIAL FORM ONCE ---
   useEffect(() => {
-    if (currentView === 'client-view') {
-      const activeProj = projects.find(p => p.id === activeProjectId);
+    if (currentView === 'client-view' && activeProjectId) {
+      const activeProj = projects.find(p => String(p.id) === String(activeProjectId));
       if (activeProj?.config?.enableTestimonialForm) {
         const hasSeen = localStorage.getItem(`testi_shown_${activeProj.id}`);
         if (!hasSeen) {
@@ -339,13 +368,13 @@ export default function App() {
     };
 
     const updated = projects.map(p => {
-      if (p.id !== activeProjectId) return p;
+      if (String(p.id) !== String(activeProjectId)) return p;
       let updatedItems;
       if (!activeFolderId) {
-        updatedItems = [...p.items, newItem];
+        updatedItems = [...(p.items || []), newItem];
       } else {
-        updatedItems = p.items.map(item => {
-          if (item.id === activeFolderId && item.type === 'folder') {
+        updatedItems = (p.items || []).map(item => {
+          if (String(item.id) === String(activeFolderId) && item.type === 'folder') {
             return { ...item, items: [...(item.items || []), newItem] };
           }
           return item;
@@ -366,10 +395,10 @@ export default function App() {
     if (!editItemTitle) { showNotification('Judul harus diisi'); return; }
 
     const updated = projects.map(p => {
-      if (p.id !== activeProjectId) return p;
+      if (String(p.id) !== String(activeProjectId)) return p;
       
-      const updateRecursive = (itemsList) => itemsList.map(it => {
-        if (it.id === editingItemId) {
+      const updateRecursive = (itemsList) => (itemsList || []).map(it => {
+        if (String(it.id) === String(editingItemId)) {
           return { ...it, title: editItemTitle, url: it.type !== 'folder' ? editItemUrl : it.url };
         }
         if (it.type === 'folder' && it.items) {
@@ -388,7 +417,7 @@ export default function App() {
   };
 
   const handleExportCSV = () => {
-    const activeProj = projects.find(p => p.id === activeProjectId);
+    const activeProj = projects.find(p => String(p.id) === String(activeProjectId));
     if (!activeProj || !activeProj.submittedTestimonials || activeProj.submittedTestimonials.length === 0) {
       showNotification('Tidak ada data testimoni.');
       return;
@@ -408,16 +437,18 @@ export default function App() {
     showNotification('CSV Berhasil Diunduh');
   };
 
-  const activeProject = projects.find(p => p.id === activeProjectId);
+  // Helper Pencarian Project & Item Aktif
+  const activeProject = projects.find(p => String(p.id) === String(activeProjectId));
+  
   const displayedItems = activeFolderId 
-    ? activeProject?.items.find(i => i.id === activeFolderId)?.items || []
+    ? activeProject?.items?.find(i => String(i.id) === String(activeFolderId))?.items || []
     : activeProject?.items || [];
 
   // --- VIEWS ---
 
   if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-white"><RefreshCw className="animate-spin" size={40} style={{color: COLOR_PRIMARY}} /></div>;
 
-  // Render Login
+  // 1. LOGIN
   if (currentView === 'login') {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 font-sans bg-white">
@@ -447,7 +478,7 @@ export default function App() {
     );
   }
 
-  // Render Project List Dashboard
+  // 2. DASHBOARD PROJECT LIST
   if (currentView === 'projects-list') {
     return (
       <div className="min-h-screen bg-gray-50 font-sans pb-12">
@@ -503,7 +534,7 @@ export default function App() {
                 <div className="p-6 flex-1 flex flex-col">
                   <div className="flex justify-between items-start mb-4">
                     <div className="p-3 text-white rounded-xl shadow-sm transition-colors" style={{ backgroundColor: COLOR_PRIMARY }}><FolderPlus size={24}/></div>
-                    <button onClick={(e) => { e.stopPropagation(); setProjectToDelete(project); }} className="text-gray-300 hover:text-red-500 z-10 p-2"><Trash2 size={18}/></button>
+                    <button onClick={(e) => { e.stopPropagation(); if(confirm("Hapus project?")) { const up = projects.filter(p => p.id !== project.id); setProjects(up); syncWithDatabase(up); } }} className="text-gray-300 hover:text-red-500 z-10 p-2"><Trash2 size={18}/></button>
                   </div>
                   
                   <h3 className="text-lg font-bold mb-1 truncate" style={{ color: COLOR_PRIMARY }}>{project.name}</h3>
@@ -513,37 +544,18 @@ export default function App() {
                     <div className="flex items-center text-[11px] font-bold text-slate-500 tracking-wide uppercase">
                       <Clock size={12} className="mr-1.5"/> {formatTimeLeft(project.expiresAt)}
                     </div>
-                    <span className="text-xs text-white px-2 py-1 rounded-md font-bold" style={{ backgroundColor: COLOR_SECONDARY }}>{project.items.length} Item</span>
+                    <span className="text-xs text-white px-2 py-1 rounded-md font-bold" style={{ backgroundColor: COLOR_SECONDARY }}>{(project.items || []).length} Item</span>
                   </div>
                 </div>
               </Card>
             ))}
           </div>
-
-          {projectToDelete && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
-              <div className="bg-white rounded-2xl max-w-sm w-full p-8 text-center shadow-2xl">
-                <AlertTriangle size={56} className="mx-auto text-red-500 mb-4"/>
-                <h3 className="font-black text-xl mb-2" style={{ color: COLOR_PRIMARY }}>HAPUS PROJECT?</h3>
-                <p className="text-sm text-slate-500 mb-8 font-medium">Semua link di dalam project "{projectToDelete.name}" akan hilang permanen.</p>
-                <div className="flex gap-3 justify-center">
-                  <Button variant="secondary" className="flex-1" onClick={() => setProjectToDelete(null)}>Batal</Button>
-                  <Button variant="danger" className="flex-1" onClick={() => {
-                    const up = projects.filter(p => p.id !== projectToDelete.id);
-                    setProjects(up);
-                    syncWithDatabase(up);
-                    setProjectToDelete(null);
-                  }}>Ya, Hapus</Button>
-                </div>
-              </div>
-            </div>
-          )}
         </main>
       </div>
     );
   }
 
-  // Render Project Editor
+  // 3. PROJECT EDITOR
   if (currentView === 'project-editor' && activeProject) {
     return (
       <div className="min-h-screen bg-gray-50 font-sans flex flex-col">
@@ -579,7 +591,7 @@ export default function App() {
             <div className="space-y-6 animate-fade-in">
               {activeFolderId && (
                 <button onClick={() => { setActiveFolderId(null); setEditingItemId(null); }} className="flex items-center text-sm hover:underline mb-2 font-bold uppercase tracking-wider" style={{ color: COLOR_SECONDARY }}>
-                  <ArrowLeft size={16} className="mr-2"/> Kembali ke {activeProject.name}
+                  <ArrowLeft size={16} className="mr-2"/> Kembali
                 </button>
               )}
 
@@ -624,10 +636,8 @@ export default function App() {
               </Card>
 
               <div className="space-y-3">
-                {displayedItems.length === 0 && <div className="text-center py-12 text-gray-400 border-2 border-dashed rounded-xl border-gray-200 font-medium">Folder Kosong</div>}
-                
-                {displayedItems.map(item => {
-                  if (editingItemId === item.id) {
+                {(displayedItems || []).map(item => {
+                  if (String(editingItemId) === String(item.id)) {
                     return (
                       <Card key={item.id} className="p-5 border-slate-200 shadow-md">
                         <div className="space-y-4">
@@ -691,13 +701,13 @@ export default function App() {
             <div className="grid grid-cols-1 gap-6 animate-fade-in">
               <Card className="p-6 shadow-md">
                  <h3 className="font-black mb-6 border-b border-gray-100 pb-3 uppercase tracking-widest text-sm" style={{ color: COLOR_PRIMARY }}>Informasi Halaman</h3>
-                 <Input label="Judul Header" value={activeProject.config.title} onChange={e => {
-                    const up = projects.map(p => p.id === activeProjectId ? {...p, config: {...p.config, title: e.target.value}} : p);
+                 <Input label="Judul Header" value={activeProject?.config?.title || ''} onChange={e => {
+                    const up = projects.map(p => String(p.id) === String(activeProjectId) ? {...p, config: {...(p.config || {}), title: e.target.value}} : p);
                     setProjects(up);
                     syncWithDatabase(up);
                  }}/>
-                 <TextArea label="Pesan Sambutan" value={activeProject.config.description} onChange={e => {
-                     const up = projects.map(p => p.id === activeProjectId ? {...p, config: {...p.config, description: e.target.value}} : p);
+                 <TextArea label="Pesan Sambutan" value={activeProject?.config?.description || ''} onChange={e => {
+                     const up = projects.map(p => String(p.id) === String(activeProjectId) ? {...p, config: {...(p.config || {}), description: e.target.value}} : p);
                      setProjects(up);
                      syncWithDatabase(up);
                  }}/>
@@ -705,18 +715,18 @@ export default function App() {
 
               <Card className="p-6 shadow-md">
                  <h3 className="font-black mb-6 border-b border-gray-100 pb-3 uppercase tracking-widest text-sm" style={{ color: COLOR_PRIMARY }}>Bantuan & Testimoni</h3>
-                 <Input label="Nomor WhatsApp (62812...)" value={activeProject.config.whatsapp} onChange={e => {
-                     const up = projects.map(p => p.id === activeProjectId ? {...p, config: {...p.config, whatsapp: e.target.value}} : p);
+                 <Input label="Nomor WhatsApp (62812...)" value={activeProject?.config?.whatsapp || ''} onChange={e => {
+                     const up = projects.map(p => String(p.id) === String(activeProjectId) ? {...p, config: {...(p.config || {}), whatsapp: e.target.value}} : p);
                      setProjects(up);
                      syncWithDatabase(up);
                  }}/>
                  <div className="mt-6">
                    <Select 
                      label="Form Pop-up Testimoni Klien"
-                     value={activeProject.config.enableTestimonialForm ? 'true' : 'false'}
+                     value={activeProject?.config?.enableTestimonialForm ? 'true' : 'false'}
                      onChange={e => {
                          const val = e.target.value === 'true';
-                         const up = projects.map(p => p.id === activeProjectId ? {...p, config: {...p.config, enableTestimonialForm: val}} : p);
+                         const up = projects.map(p => String(p.id) === String(activeProjectId) ? {...p, config: {...(p.config || {}), enableTestimonialForm: val}} : p);
                          setProjects(up);
                          syncWithDatabase(up);
                      }}
@@ -737,7 +747,7 @@ export default function App() {
                   <Button onClick={handleExportCSV} variant="secondary" className="text-xs" icon={Download}>Export CSV</Button>
                </div>
                <div className="space-y-4">
-                  {(!activeProject.submittedTestimonials || activeProject.submittedTestimonials.length === 0) ? (
+                  {(!activeProject?.submittedTestimonials || activeProject.submittedTestimonials.length === 0) ? (
                      <div className="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300 text-gray-500 font-medium">Belum ada testimoni.</div>
                   ) : (
                      activeProject.submittedTestimonials.map(t => (
@@ -760,7 +770,7 @@ export default function App() {
     );
   }
 
-  // Render Client View (Preview)
+  // 4. CLIENT VIEW (ONE DREAM UI)
   if (currentView === 'client-view' && activeProject) {
     const ClientItemRenderer = ({ item }) => {
       const [isOpen, setIsOpen] = useState(false);
@@ -781,7 +791,7 @@ export default function App() {
             </button>
             {isOpen && (
               <div className="bg-slate-50 p-4 space-y-3 border-t border-gray-200">
-                {item.items && item.items.length > 0 ? (
+                {(item.items && item.items.length > 0) ? (
                    item.items.map(sub => <ClientItemRenderer key={sub.id} item={sub} />)
                 ) : (
                    <p className="text-sm text-slate-400 text-center py-4 font-medium">Folder ini kosong</p>
@@ -827,7 +837,7 @@ export default function App() {
 
     return (
       <div className="min-h-screen bg-slate-100 font-sans flex flex-col relative">
-        {showTestimonial && activeProject.config.enableTestimonialForm && (
+        {showTestimonial && activeProject?.config?.enableTestimonialForm && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
              <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center relative shadow-2xl">
                 <button onClick={() => setShowTestimonial(false)} className="absolute top-5 right-5 text-gray-400"><X size={20}/></button>
@@ -837,7 +847,7 @@ export default function App() {
                 <Button variant="primary" className="w-full mt-2 py-3" onClick={() => {
                       if (!clientTestiName || !clientTestiMsg) return;
                       const newTesti = { id: Date.now(), name: clientTestiName, message: clientTestiMsg, date: new Date().toLocaleDateString('id-ID') };
-                      const up = projects.map(p => p.id === activeProject.id ? { ...p, submittedTestimonials: [...(p.submittedTestimonials || []), newTesti] } : p);
+                      const up = projects.map(p => String(p.id) === String(activeProject.id) ? { ...p, submittedTestimonials: [...(p.submittedTestimonials || []), newTesti] } : p);
                       setProjects(up);
                       syncWithDatabase(up);
                       setShowTestimonial(false);
@@ -854,22 +864,22 @@ export default function App() {
           <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" style={{ backgroundColor: 'rgba(1, 1, 61, 0.8)' }}></div> 
           <div className="relative z-10 max-w-md mx-auto flex flex-col items-center">
              <div className="w-24 h-24 rounded-full bg-white mb-6 flex items-center justify-center shadow-2xl border-4" style={{borderColor: COLOR_PRIMARY}}><Layout size={40} style={{color: COLOR_PRIMARY}}/></div>
-             <h1 className="text-3xl font-black mb-4 uppercase tracking-tight">{activeProject.config.title}</h1>
-             <p className="text-slate-200 text-sm font-medium">{activeProject.config.description}</p>
+             <h1 className="text-3xl font-black mb-4 uppercase tracking-tight">{activeProject?.config?.title || activeProject?.name}</h1>
+             <p className="text-slate-200 text-sm font-medium">{activeProject?.config?.description || ''}</p>
           </div>
         </div>
 
         <div className="flex-1 max-w-md w-full mx-auto px-4 -mt-10 relative z-20 pb-20">
           <div className="shadow-xl rounded-xl p-4 flex items-center justify-between mb-6 text-white" style={{ backgroundColor: COLOR_SECONDARY }}>
-              <div className="flex flex-col text-left"><span className="text-[10px] font-bold uppercase opacity-80">Batas Waktu Akses</span><span className="text-sm font-black">{formatTimeLeft(activeProject.expiresAt)}</span></div>
+              <div className="flex flex-col text-left"><span className="text-[10px] font-bold uppercase opacity-80">Batas Waktu Akses</span><span className="text-sm font-black">{formatTimeLeft(activeProject?.expiresAt)}</span></div>
               <Clock size={24} className="animate-pulse" />
           </div>
           <div className="space-y-1">
-             {activeProject.items.map(item => <ClientItemRenderer key={item.id} item={item} />)}
+             {(activeProject?.items || []).map(item => <ClientItemRenderer key={item.id} item={item} />)}
           </div>
         </div>
         
-        {activeProject.config.whatsapp && (
+        {activeProject?.config?.whatsapp && (
            <a href={`https://wa.me/${activeProject.config.whatsapp}`} target="_blank" className="bg-green-600 text-white px-8 py-4 rounded-full shadow-lg fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 text-xs font-bold uppercase tracking-wider z-50">
              <MessageCircle size={20}/> Hubungi Kami
            </a>
@@ -880,11 +890,15 @@ export default function App() {
     );
   }
 
-  // Final Fallback: Kembali ke Login jika terjadi error navigasi atau data hilang
+  // --- FINAL FALLBACK (Jika data hilang atau error navigasi) ---
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 flex-col gap-4">
-       <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Sesi Berakhir atau Terjadi Galat Navigasi</p>
-       <Button variant="primary" onClick={() => { setCurrentView('login'); setActiveProjectId(null); }}>Kembali ke Login</Button>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 flex-col gap-4 p-6 text-center">
+       <AlertTriangle size={48} className="text-amber-500 mb-2" />
+       <div>
+         <p className="text-slate-900 font-black uppercase text-sm tracking-widest">Sesi Berakhir atau Project Tidak Ditemukan</p>
+         <p className="text-slate-500 text-xs mt-1">Data sedang disinkronkan atau Anda telah keluar sistem.</p>
+       </div>
+       <Button variant="primary" className="mt-4 px-10" onClick={() => { setCurrentView('login'); setActiveProjectId(null); }}>Kembali ke Login</Button>
     </div>
   );
 }
