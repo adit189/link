@@ -81,8 +81,9 @@ const Button = ({ children, onClick, variant = 'primary', className = '', icon: 
     whatsapp: `bg-green-600 text-white hover:bg-green-700 shadow-xl hover:scale-105`
   };
 
-  const inlineStyle = variant === 'primary' ? { backgroundColor: COLOR_PRIMARY } : 
-                      variant === 'secondary' ? { color: COLOR_PRIMARY, borderColor: COLOR_PRIMARY } : {};
+  let inlineStyle = {};
+  if (variant === 'primary') inlineStyle = { backgroundColor: COLOR_PRIMARY };
+  else if (variant === 'secondary') inlineStyle = { color: COLOR_PRIMARY, borderColor: COLOR_PRIMARY };
 
   return (
     <button type={type} onClick={onClick} disabled={disabled} className={`${baseStyle} ${variants[variant]} ${className}`} style={inlineStyle}>
@@ -416,7 +417,7 @@ export default function App() {
 
   if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-white"><RefreshCw className="animate-spin" size={40} style={{color: COLOR_PRIMARY}} /></div>;
 
-  // 1. LOGIN
+  // Render Login
   if (currentView === 'login') {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 font-sans bg-white">
@@ -446,7 +447,7 @@ export default function App() {
     );
   }
 
-  // 2. DASHBOARD PROJECT LIST
+  // Render Project List Dashboard
   if (currentView === 'projects-list') {
     return (
       <div className="min-h-screen bg-gray-50 font-sans pb-12">
@@ -542,7 +543,7 @@ export default function App() {
     );
   }
 
-  // 3. PROJECT EDITOR
+  // Render Project Editor
   if (currentView === 'project-editor' && activeProject) {
     return (
       <div className="min-h-screen bg-gray-50 font-sans flex flex-col">
@@ -759,9 +760,8 @@ export default function App() {
     );
   }
 
-  // 4. CLIENT VIEW (ONE DREAM UI)
+  // Render Client View (Preview)
   if (currentView === 'client-view' && activeProject) {
-    
     const ClientItemRenderer = ({ item }) => {
       const [isOpen, setIsOpen] = useState(false);
       const youtubeId = item.type === 'video' ? getYouTubeId(item.url) : null;
@@ -880,5 +880,11 @@ export default function App() {
     );
   }
 
-  return null;
+  // Final Fallback: Kembali ke Login jika terjadi error navigasi atau data hilang
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 flex-col gap-4">
+       <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">Sesi Berakhir atau Terjadi Galat Navigasi</p>
+       <Button variant="primary" onClick={() => { setCurrentView('login'); setActiveProjectId(null); }}>Kembali ke Login</Button>
+    </div>
+  );
 }
