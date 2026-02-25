@@ -160,13 +160,22 @@ const TextArea = ({ label, value, onChange, placeholder, rows = 3, ...props }) =
 
 export default function App() {
   
-  // PENGECEKAN MODE KLIEN VIA URL (Menggunakan Slug atau ID)
-  const urlParams = new URLSearchParams(window.location.search);
-  const clientParam = urlParams.get('client');
+  // PENGECEKAN MODE KLIEN VIA DIRECT PATH (Misal: /wedding-a-b)
+  const getSlugFromPath = () => {
+    const path = window.location.pathname;
+    if (path === '/' || path === '/index.html' || path === '') return null;
+    const segments = path.split('/').filter(Boolean);
+    if (segments.length > 0 && segments[0] !== 'index.html') {
+      return segments[0]; // Mengambil '/nama-project' sebagai slug
+    }
+    return null;
+  };
+  
+  const clientSlug = getSlugFromPath();
 
   // --- STATE ---
-  const [isClientMode, setIsClientMode] = useState(!!clientParam);
-  const [currentView, setCurrentView] = useState(clientParam ? 'client-view' : 'login');
+  const [isClientMode, setIsClientMode] = useState(!!clientSlug);
+  const [currentView, setCurrentView] = useState(clientSlug ? 'client-view' : 'login');
   const [activeProjectId, setActiveProjectId] = useState(null); // Diatur setelah fetch data
   
   const [editorTab, setEditorTab] = useState('content');
@@ -236,9 +245,9 @@ export default function App() {
 
   useEffect(() => {
     const resolveClientProject = (projectsData) => {
-      if (clientParam) {
-        // Cari project berdasarkan slug atau ID (untuk backward compatibility)
-        const matched = projectsData.find(p => p.slug === clientParam || String(p.id) === clientParam);
+      if (clientSlug) {
+        // Cari project berdasarkan slug secara langsung
+        const matched = projectsData.find(p => p.slug === clientSlug);
         if (matched) {
           setActiveProjectId(matched.id);
         }
@@ -311,7 +320,7 @@ export default function App() {
     };
 
     fetchData();
-  }, [clientParam]);
+  }, [clientSlug]);
 
   const syncWithDatabase = async (currentProjects) => {
     localStorage.setItem('drivelink_backup', JSON.stringify(currentProjects));
@@ -371,7 +380,8 @@ export default function App() {
   // --- ACTIONS ---
 
   const handleCopyLink = (slug) => {
-    const link = `${window.location.origin}${window.location.pathname}?client=${slug}`;
+    // Format link diubah agar langsung /nama-project
+    const link = `${window.location.origin}/${slug}`;
     
     const textArea = document.createElement("textarea");
     textArea.value = link;
@@ -631,8 +641,8 @@ export default function App() {
                  <Clock size={14}/> {formatTimeLeft(activeProject.expiresAt)}
                </div>
                
-               {/* Tombol Copy Link menggunakan Slug */}
-               <Button variant="secondary" className="py-2 text-sm w-full sm:w-auto" icon={Copy} onClick={() => handleCopyLink(activeProject.slug || activeProject.id)}>Salin Link</Button>
+               {/* Tombol Copy Link menggunakan Slug project langsung */}
+               <Button variant="secondary" className="py-2 text-sm w-full sm:w-auto" icon={Copy} onClick={() => handleCopyLink(activeProject.slug)}>Salin Link</Button>
                
                <Button variant="primary" className="py-2 text-sm w-full sm:w-auto" icon={ExternalLink} onClick={() => setCurrentView('client-view')}>Preview Klien</Button>
             </div>
