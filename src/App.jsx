@@ -78,7 +78,6 @@ const getYouTubeId = (url) => {
 // --- KOMPONEN UI ---
 
 const Button = ({ children, onClick, variant = 'primary', className = '', icon: Icon, disabled, type="button" }) => {
-  // Animasi diubah menjadi pop ke atas (hover:-translate-y-1) dan kembali saat diklik (active:translate-y-0)
   const baseStyle = "flex items-center justify-center px-5 py-2.5 rounded-lg font-bold transition-all duration-300 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed tracking-wide active:translate-y-0";
   
   const variants = {
@@ -161,14 +160,14 @@ const TextArea = ({ label, value, onChange, placeholder, rows = 3, ...props }) =
 
 export default function App() {
   
-  // PENGECEKAN MODE KLIEN VIA URL
+  // PENGECEKAN MODE KLIEN VIA URL (Menggunakan Slug atau ID)
   const urlParams = new URLSearchParams(window.location.search);
-  const initialClientId = urlParams.get('client');
+  const clientParam = urlParams.get('client');
 
   // --- STATE ---
-  const [isClientMode, setIsClientMode] = useState(!!initialClientId);
-  const [currentView, setCurrentView] = useState(initialClientId ? 'client-view' : 'login');
-  const [activeProjectId, setActiveProjectId] = useState(initialClientId || null);
+  const [isClientMode, setIsClientMode] = useState(!!clientParam);
+  const [currentView, setCurrentView] = useState(clientParam ? 'client-view' : 'login');
+  const [activeProjectId, setActiveProjectId] = useState(null); // Diatur setelah fetch data
   
   const [editorTab, setEditorTab] = useState('content');
   const [activeFolderId, setActiveFolderId] = useState(null);
@@ -179,7 +178,7 @@ export default function App() {
   
   // State Pop Up Klien
   const [showTestimonial, setShowTestimonial] = useState(false);
-  const [isClosingTesti, setIsClosingTesti] = useState(false); // Untuk Animasi Tutup
+  const [isClosingTesti, setIsClosingTesti] = useState(false);
   const [clientTestiName, setClientTestiName] = useState('');
   const [clientTestiMsg, setClientTestiMsg] = useState('');
   
@@ -210,6 +209,18 @@ export default function App() {
     setTimeout(() => setNotification(null), 3000);
   };
 
+  // Helper Pencarian Project & Item Aktif
+  const activeProject = projects.find(p => String(p.id) === String(activeProjectId));
+
+  // --- EFFECT: DINAMIS DOCUMENT TITLE ---
+  useEffect(() => {
+    if (currentView === 'client-view' && activeProject) {
+      document.title = activeProject.name;
+    } else {
+      document.title = 'One Link';
+    }
+  }, [currentView, activeProject]);
+
   // --- DATABASE OPERATIONS ---
 
   const getFullApiUrl = (params = "") => {
@@ -224,6 +235,16 @@ export default function App() {
   };
 
   useEffect(() => {
+    const resolveClientProject = (projectsData) => {
+      if (clientParam) {
+        // Cari project berdasarkan slug atau ID (untuk backward compatibility)
+        const matched = projectsData.find(p => p.slug === clientParam || String(p.id) === clientParam);
+        if (matched) {
+          setActiveProjectId(matched.id);
+        }
+      }
+    };
+
     const fetchData = async () => {
       try {
         const url = getFullApiUrl(`?user_id=${USER_ID}`);
@@ -250,6 +271,7 @@ export default function App() {
         if (data && Array.isArray(data) && data.length > 0) {
           setProjects(data);
           localStorage.setItem('drivelink_backup', JSON.stringify(data));
+          resolveClientProject(data);
         } else {
           loadFallbackData();
         }
@@ -263,14 +285,15 @@ export default function App() {
 
     const loadFallbackData = () => {
       const localData = localStorage.getItem('drivelink_backup');
+      let parsedData = [];
       if (localData) {
-        setProjects(JSON.parse(localData));
+        parsedData = JSON.parse(localData);
       } else {
-        setProjects([
+        parsedData = [
           {
             id: 'p1',
             name: 'Project Alpha Launch',
-            slug: 'project-alpha',
+            slug: 'project-alpha-launch',
             expiresAt: Date.now() + (7 * 24 * 60 * 60 * 1000), 
             config: {
               title: 'Project Alpha Assets',
@@ -281,12 +304,14 @@ export default function App() {
             items: [],
             submittedTestimonials: []
           }
-        ]);
+        ];
       }
+      setProjects(parsedData);
+      resolveClientProject(parsedData);
     };
 
     fetchData();
-  }, []);
+  }, [clientParam]);
 
   const syncWithDatabase = async (currentProjects) => {
     localStorage.setItem('drivelink_backup', JSON.stringify(currentProjects));
@@ -345,8 +370,8 @@ export default function App() {
 
   // --- ACTIONS ---
 
-  const handleCopyLink = (id) => {
-    const link = `${window.location.origin}${window.location.pathname}?client=${id}`;
+  const handleCopyLink = (slug) => {
+    const link = `${window.location.origin}${window.location.pathname}?client=${slug}`;
     
     const textArea = document.createElement("textarea");
     textArea.value = link;
@@ -480,9 +505,6 @@ export default function App() {
     showNotification('CSV Berhasil Diunduh');
   };
 
-  // Helper Pencarian Project & Item Aktif
-  const activeProject = projects.find(p => String(p.id) === String(activeProjectId));
-  
   const displayedItems = activeFolderId 
     ? activeProject?.items?.find(i => String(i.id) === String(activeFolderId))?.items || []
     : activeProject?.items || [];
@@ -609,8 +631,8 @@ export default function App() {
                  <Clock size={14}/> {formatTimeLeft(activeProject.expiresAt)}
                </div>
                
-               {/* Tombol Copy Link (Admin) */}
-               <Button variant="secondary" className="py-2 text-sm w-full sm:w-auto" icon={Copy} onClick={() => handleCopyLink(activeProject.id)}>Salin Link</Button>
+               {/* Tombol Copy Link menggunakan Slug */}
+               <Button variant="secondary" className="py-2 text-sm w-full sm:w-auto" icon={Copy} onClick={() => handleCopyLink(activeProject.slug || activeProject.id)}>Salin Link</Button>
                
                <Button variant="primary" className="py-2 text-sm w-full sm:w-auto" icon={ExternalLink} onClick={() => setCurrentView('client-view')}>Preview Klien</Button>
             </div>
