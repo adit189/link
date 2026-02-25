@@ -36,10 +36,10 @@ import {
 // --- UTILITAS & PENGATURAN GLOBAL ---
 
 // [PETUNJUK]: Ganti tautan (link) gambar di bawah ini untuk MENGUBAH LOGO
-const LOGO_URL = "https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=200&h=200&auto=format&fit=crop"; 
+const LOGO_URL = "https://link.onedream.id/logod.png"; 
 
 // [PETUNJUK]: Ganti tautan gambar di bawah ini untuk MENGUBAH FOTO BACKGROUND KLIEN
-const HEADER_BG_URL = "https://images.unsplash.com/photo-1542044896530-05d3c8c566bf?q=80&w=1000&auto=format&fit=crop";
+const HEADER_BG_URL = "https://link.onedream.id/bg-4.png";
 
 // [PETUNJUK]: Ubah nomor di bawah jika kolom WhatsApp per project kosong
 const DEFAULT_WHATSAPP = "628123456789";
