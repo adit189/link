@@ -943,7 +943,6 @@ export default function App() {
           )}
 
           <div className="relative text-white pt-24 pb-24 px-4 bg-cover bg-center" style={{ backgroundImage: `url('${HEADER_BG_URL}')` }}>
-            <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" style={{ backgroundColor: 'rgba(1, 1, 61, 0.8)' }}></div> 
             {/* Wrapper diatur agar lebar dan posisinya sama persis dengan kartu konten (w-full max-w-md) namun teks dibuat rata tengah (text-center) */}
             <div className="relative z-10 max-w-md w-full mx-auto flex flex-col items-center text-center">
                <img src={LOGO_URL} alt="Logo" className="w-24 h-24 rounded-full bg-white mb-6 flex items-center justify-center shadow-2xl border-4 object-cover self-center" style={{borderColor: COLOR_PRIMARY}} />
