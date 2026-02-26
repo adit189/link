@@ -156,6 +156,72 @@ const TextArea = ({ label, value, onChange, placeholder, rows = 3, ...props }) =
   </div>
 );
 
+// --- KOMPONEN PREVIEW KLIEN (Dipisah agar tidak ter-reset saat hitung mundur berjalan) ---
+const ClientItemRenderer = ({ item }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const youtubeId = item.type === 'video' ? getYouTubeId(item.url) : null;
+
+  if (item.type === 'folder') {
+    return (
+      <div className="rounded-xl overflow-hidden mb-4 shadow-md w-full transition-all duration-300 hover:-translate-y-1 hover:shadow-lg" style={{ backgroundColor: COLOR_TERTIARY }}>
+        <button 
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full flex items-center justify-between p-5 transition-colors active:translate-y-0"
+        >
+          <div className="flex items-center gap-3 text-white">
+            <Folder size={22} className="text-white" />
+            <span className="font-bold text-base text-white">{item.title}</span>
+          </div>
+          {isOpen ? <ChevronUp size={20} className="text-white"/> : <ChevronDown size={20} className="text-white"/>}
+        </button>
+        {isOpen && (
+          <div className="p-4 space-y-3 bg-black/10 border-t border-white/20">
+            {(item.items && item.items.length > 0) ? (
+               item.items.map(sub => <ClientItemRenderer key={sub.id} item={sub} />)
+            ) : (
+               <p className="text-sm text-white/80 text-center py-4 font-medium">Folder ini kosong</p>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (youtubeId) {
+    return (
+      <div className="mb-6 p-4 rounded-xl shadow-md border w-full transition-all duration-300 hover:-translate-y-1 hover:shadow-lg" style={{ backgroundColor: COLOR_PRIMARY }}>
+         <div className="flex items-center gap-2 mb-3 text-white">
+            <PlayCircle size={18} className="text-white"/>
+            <span className="font-bold text-sm tracking-wide text-white">{item.title}</span>
+         </div>
+         <iframe width="100%" className="aspect-video rounded-xl shadow-inner bg-black" src={`https://www.youtube.com/embed/${youtubeId}`} frameBorder="0" allowFullScreen></iframe>
+      </div>
+    );
+  }
+
+  let IconVar = LinkIcon;
+  if (item.type === 'photo') IconVar = ImageIcon;
+  else if (item.type === 'file') IconVar = File;
+  else if (item.type === 'video') IconVar = Video;
+
+  return (
+    <a 
+      href={item.url} target="_blank" rel="noreferrer"
+      className="block p-5 rounded-xl shadow-md hover:-translate-y-1 hover:shadow-lg active:translate-y-0 transition-all duration-300 mb-4 flex items-center justify-between w-full group"
+      style={{ backgroundColor: COLOR_PRIMARY }}
+    >
+      <div className="flex items-center gap-4 text-white">
+        <div className="p-3 rounded-xl bg-white/10 group-hover:bg-white/20 transition-colors">
+          <IconVar size={22} className="text-white"/>
+        </div>
+        <span className="font-bold text-base text-white">{item.title}</span>
+      </div>
+      <ExternalLink size={18} className="text-white/50 group-hover:text-white transition-colors" />
+    </a>
+  );
+};
+
+
 // --- APLIKASI UTAMA ---
 
 export default function App() {
@@ -380,7 +446,6 @@ export default function App() {
   // --- ACTIONS ---
 
   const handleCopyLink = (slug) => {
-    // Format link diubah agar langsung /nama-project
     const link = `${window.location.origin}/${slug}`;
     
     const textArea = document.createElement("textarea");
@@ -641,7 +706,6 @@ export default function App() {
                  <Clock size={14}/> {formatTimeLeft(activeProject.expiresAt)}
                </div>
                
-               {/* Tombol Copy Link menggunakan Slug project langsung */}
                <Button variant="secondary" className="py-2 text-sm w-full sm:w-auto" icon={Copy} onClick={() => handleCopyLink(activeProject.slug)}>Salin Link</Button>
                
                <Button variant="primary" className="py-2 text-sm w-full sm:w-auto" icon={ExternalLink} onClick={() => setCurrentView('client-view')}>Preview Klien</Button>
@@ -848,69 +912,6 @@ export default function App() {
 
     // 4. CLIENT VIEW (ONE DREAM UI)
     if (currentView === 'client-view' && activeProject) {
-      const ClientItemRenderer = ({ item }) => {
-        const [isOpen, setIsOpen] = useState(false);
-        const youtubeId = item.type === 'video' ? getYouTubeId(item.url) : null;
-
-        if (item.type === 'folder') {
-          return (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-4 shadow-sm w-full transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
-              <button 
-                onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between p-5 bg-white hover:bg-slate-50 transition-colors active:translate-y-0"
-              >
-                <div className="flex items-center gap-3">
-                  <Folder size={22} style={{ color: COLOR_PRIMARY }} />
-                  <span className="font-bold text-base" style={{ color: COLOR_PRIMARY }}>{item.title}</span>
-                </div>
-                {isOpen ? <ChevronUp size={20} className="text-slate-400"/> : <ChevronDown size={20} className="text-slate-400"/>}
-              </button>
-              {isOpen && (
-                <div className="bg-slate-50 p-4 space-y-3 border-t border-gray-200">
-                  {(item.items && item.items.length > 0) ? (
-                     item.items.map(sub => <ClientItemRenderer key={sub.id} item={sub} />)
-                  ) : (
-                     <p className="text-sm text-slate-400 text-center py-4 font-medium">Folder ini kosong</p>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        }
-
-        if (youtubeId) {
-          return (
-            <div className="mb-6 bg-white p-4 rounded-xl shadow-md border w-full">
-               <div className="flex items-center gap-2 mb-3">
-                  <PlayCircle size={18} style={{ color: COLOR_SECONDARY }}/>
-                  <span className="font-bold text-sm tracking-wide" style={{ color: COLOR_PRIMARY }}>{item.title}</span>
-               </div>
-               <iframe width="100%" className="aspect-video rounded-xl" src={`https://www.youtube.com/embed/${youtubeId}`} frameBorder="0" allowFullScreen></iframe>
-            </div>
-          );
-        }
-
-        let iconColor = "text-blue-600 bg-blue-50";
-        if (item.type === 'photo') iconColor = "text-purple-600 bg-purple-50";
-        else if (item.type === 'file') iconColor = "text-orange-600 bg-orange-50";
-        else if (item.type === 'video') iconColor = `text-[${COLOR_SECONDARY}] bg-pink-50`;
-
-        return (
-          <a 
-            href={item.url} target="_blank" rel="noreferrer"
-            className="block bg-white p-5 rounded-xl shadow-md border hover:-translate-y-1 hover:shadow-lg active:translate-y-0 transition-all duration-300 mb-4 flex items-center justify-between w-full"
-          >
-            <div className="flex items-center gap-4">
-              <div className={`p-3 rounded-xl ${iconColor}`}>
-                {item.type === 'photo' ? <ImageIcon size={22}/> : <LinkIcon size={22}/>}
-              </div>
-              <span className="font-bold text-base" style={{ color: COLOR_PRIMARY }}>{item.title}</span>
-            </div>
-            <ExternalLink size={18} className="text-slate-300" />
-          </a>
-        );
-      };
-
       return (
         <div className="min-h-screen bg-slate-100 flex flex-col relative">
           
@@ -943,6 +944,7 @@ export default function App() {
           )}
 
           <div className="relative text-white pt-24 pb-24 px-4 bg-cover bg-center" style={{ backgroundImage: `url('${HEADER_BG_URL}')` }}>
+            <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm" style={{ backgroundColor: 'rgba(1, 1, 61, 0.8)' }}></div> 
             {/* Wrapper diatur agar lebar dan posisinya sama persis dengan kartu konten (w-full max-w-md) namun teks dibuat rata tengah (text-center) */}
             <div className="relative z-10 max-w-md w-full mx-auto flex flex-col items-center text-center">
                <img src={LOGO_URL} alt="Logo" className="w-24 h-24 rounded-full bg-white mb-6 flex items-center justify-center shadow-2xl border-4 object-cover self-center" style={{borderColor: COLOR_PRIMARY}} />
