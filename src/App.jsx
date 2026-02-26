@@ -163,23 +163,29 @@ const ClientItemRenderer = ({ item }) => {
 
   if (item.type === 'folder') {
     return (
-      <div className="rounded-xl overflow-hidden mb-4 shadow-md w-full transition-all duration-300 hover:-translate-y-1 hover:shadow-lg" style={{ backgroundColor: COLOR_TERTIARY }}>
+      <div 
+        className="rounded-xl overflow-hidden mb-4 shadow-md w-full transition-all duration-300 hover:-translate-y-1 hover:shadow-lg" 
+        style={{ 
+          backgroundColor: isOpen ? '#ffffff' : COLOR_TERTIARY,
+          border: isOpen ? `2px solid ${COLOR_TERTIARY}` : 'none'
+        }}
+      >
         <button 
           onClick={() => setIsOpen(!isOpen)}
           className="w-full flex items-center justify-between p-5 transition-colors active:translate-y-0"
         >
-          <div className="flex items-center gap-3 text-white">
-            <Folder size={22} className="text-white" />
-            <span className="font-bold text-base text-white">{item.title}</span>
+          <div className="flex items-center gap-3" style={{ color: isOpen ? COLOR_TERTIARY : '#ffffff' }}>
+            <Folder size={22} />
+            <span className="font-bold text-base">{item.title}</span>
           </div>
-          {isOpen ? <ChevronUp size={20} className="text-white"/> : <ChevronDown size={20} className="text-white"/>}
+          {isOpen ? <ChevronUp size={20} style={{ color: COLOR_TERTIARY }}/> : <ChevronDown size={20} className="text-white"/>}
         </button>
         {isOpen && (
-          <div className="p-4 space-y-3 bg-black/10 border-t border-white/20">
+          <div className="p-4 space-y-3 bg-slate-50 border-t border-slate-100">
             {(item.items && item.items.length > 0) ? (
                item.items.map(sub => <ClientItemRenderer key={sub.id} item={sub} />)
             ) : (
-               <p className="text-sm text-white/80 text-center py-4 font-medium">Folder ini kosong</p>
+               <p className="text-sm text-slate-400 text-center py-4 font-medium">Folder ini kosong</p>
             )}
           </div>
         )}
